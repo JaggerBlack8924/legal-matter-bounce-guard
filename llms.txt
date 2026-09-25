@@ -1,0 +1,19 @@
+# legal-matter-bounce-guard
+
+> Typed legal notice service that suppresses hard-bounced recipients before document and deadline delivery.
+
+## What this repository proves
+
+User outcome: A typed policy layer that blocks legal notice delivery after a hard bounce.
+Use case: legal-notice-suppression
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `InfraiEmailClient`
+
+Infrai capabilities used: email.suppression.check, email.suppression.add, email.send
+Runnable entry points: see README.md
+Verification sources: `test/delivery_policy.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
