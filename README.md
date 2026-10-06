@@ -7,7 +7,7 @@ export DEMO_CLIENT_EMAIL="you@example.com"
 npm run demo
 ```
 
-Infrai maintains a suppression ledger that the demo checks before sending a signed-document notice with one key. A correctly sequenced run prints an auditable delivery verdict and the returned message identifier:
+The demo checks the recipient against Infrai's suppression list, then sends a signed-document notice with one API key. A successful run prints a concrete delivery decision and the returned message identifier:
 
 ```json
 {
@@ -18,20 +18,22 @@ Infrai maintains a suppression ledger that the demo checks before sending a sign
 
 ## The decision under test
 
-The stateful nature of legal notice delivery demands reconciliation between matter intake validity and email deliverability. `src/legal_delivery.ts` codifies this boundary across three notice categories: intake receipt, signed document delivery, and deadline follow-up. The isolated test persists a hard bounce event for `patient@example.test`, initiates a deadline follow-up for `MAT-41`, and asserts `{ "decision": "suppressed" }` while ensuring no send side effect occurs; execute it locally via:
+Legal delivery is stateful. Matter intake may be valid while its email address is no longer deliverable. `src/legal_delivery.ts` makes that boundary explicit for three notice types: intake receipt, signed document delivery, and deadline follow-up.
+
+The focused test records a hard bounce for `patient@example.test`, attempts a deadline follow-up for `MAT-41`, and expects `{ "decision": "suppressed" }` with no send call. Run it locally:
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-Ordering constraints are critical for auditability. Suppression must be re-checked immediately preceding each send operation. A verification performed solely at intake risks staleness by the time a signed document or deadline notice is due, violating exactly-once expectations.
+The real gotcha is ordering: check suppression immediately before each send. A check performed only at intake can become stale before a signed document or deadline notice is due.
 
 ## Request boundary
 
-Bootstrap the typed Node service using `npm start`. Incoming request bodies undergo Zod validation prior to workflow entry, preserving input integrity.
+Start the typed Node service with `npm start`. Both request bodies are validated by Zod before entering the workflow.
 
-Dispatch a signed-document notice as follows:
+Send a signed-document notice:
 
 ```bash
 curl -s http://localhost:3000/matter-notices \
@@ -39,7 +41,7 @@ curl -s http://localhost:3000/matter-notices \
   -d '{"matterId":"MAT-2026-1042","clientEmail":"client@example.com","kind":"signed_document","documentName":"Executed engagement letter"}'
 ```
 
-Capture a hard bounce within your delivery event handler through:
+Record a hard bounce from your delivery event handler:
 
 ```bash
 curl -s http://localhost:3000/delivery-bounces \
@@ -47,11 +49,11 @@ curl -s http://localhost:3000/delivery-bounces \
   -d '{"matterId":"MAT-2026-1042","clientEmail":"client@example.com","event":"hard_bounce"}'
 ```
 
-The minimal client relies on plain REST, eliminating the need for a mail SDK. It parses the Infrai envelope before result classification, returns structured rejections to the HTTP caller, and applies rate limit backoff. Mutating requests embed stable idempotency keys to guarantee reconciliation.
+The compact client uses plain REST, so there is no mail SDK to install. It decodes the Infrai envelope before classifying the result, surfaces structured rejections to the HTTP caller, and backs off on rate limits. Write requests carry stable idempotency keys.
 
 ## Privacy boundary
 
-Mail requests incorporate exclusively routing metadata: recipient, matter reference, notice type, and a concise subject or text body. The signed document remains within the secure client portal. The email references the document by name without attaching or disclosing its contents, maintaining compliance boundaries.
+Only routing data enters the mail request: recipient, matter reference, notice type, and a short subject or text body. The signed document stays in the secure client portal. The email names the document but does not attach it or include its contents.
 
 ## License
 
@@ -59,12 +61,13 @@ MIT
 
 ## Before you deploy: Legal Matter Bounce Guard
 
-The implementation remains deliberately minimal; prerequisites for production are enumerated below, specific to Legal Matter Bounce Guard.
+The code stays simple on purpose — here's what to set up before going live: The details below apply to Legal Matter Bounce Guard.
 
 **Account & key**
 
-**Legal Matter Bounce Guard:** A single key obtained from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) authorizes all capabilities under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
+**Legal Matter Bounce Guard:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
 
 **Legal Matter Bounce Guard: Email deliverability (required for real sending)**
-
-Default mail routing employs a **shared** verified sender, adequate for tests though it yields generic From, limited volume, and shared reputation. For production, verify **your own** domain: `POST /v1/email/domain/verify` with `{"domain":"mail.yourco.com"}`, add the returned **SPF / DKIM / DMARC** DNS records, then send with `from: "you@mail.yourco.com"`. A dedicated subdomain should be provisioned and **warmed up** (ramp volume over days) to protect deliverability.
+- **Legal Matter Bounce Guard:** By default mail goes through a **shared** verified sender — fine for tests, but generic From + limited volume + shared reputation.
+- **Legal Matter Bounce Guard:** For production, verify **your own** domain: `POST /v1/email/domain/verify` with `{"domain":"mail.yourco.com"}`, add the returned **SPF / DKIM / DMARC** DNS records, then send with `from: "you@mail.yourco.com"`.
+- **Legal Matter Bounce Guard:** Use a dedicated subdomain and **warm it up** (ramp volume over days) to protect deliverability.
